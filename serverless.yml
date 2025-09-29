@@ -1,0 +1,97 @@
+service: dataforge
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  timeout: 30
+  memorySize: 512
+  
+  environment:
+    DATAFORGE_ENVIRONMENT: ${self:provider.stage}
+    DATAFORGE_RDS_HOST: ${env:DATAFORGE_RDS_HOST}
+    DATAFORGE_RDS_PORT: ${env:DATAFORGE_RDS_PORT, '5432'}
+    DATAFORGE_RDS_DATABASE: ${env:DATAFORGE_RDS_DATABASE, 'dataforge'}
+    DATAFORGE_RDS_USERNAME: ${env:DATAFORGE_RDS_USERNAME, 'postgres'}
+    DATAFORGE_RDS_PASSWORD: ${env:DATAFORGE_RDS_PASSWORD}
+    DATAFORGE_S3_BUCKET: ${self:custom.s3Bucket}
+    AWS_REGION: ${self:provider.region}
+  
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
+          Resource: "arn:aws:s3:::${self:custom.s3Bucket}/*"
+        - Effect: Allow
+          Action:
+            - secretsmanager:GetSecretValue
+          Resource: "arn:aws:secretsmanager:${self:provider.region}:*:secret:dataforge/*"
+
+custom:
+  s3Bucket: dataforge-exports-${self:provider.stage}-${self:provider.region}
+  
+  pythonRequirements:
+    dockerizePip: true
+    slim: true
+    strip: false
+
+plugins:
+  - serverless-python-requirements
+  - serverless-s3-remover
+
+functions:
+  api:
+    handler: apps.api.main.app
+    events:
+      - http:
+          path: /{proxy+}
+          method: ANY
+          cors: true
+      - http:
+          path: /
+          method: ANY
+          cors: true
+
+resources:
+  Resources:
+    DataForgeS3Bucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.s3Bucket}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders: ['*']
+              AllowedMethods: [GET, PUT, POST, DELETE, HEAD]
+              AllowedOrigins: ['*']
+              MaxAge: 3000
+
+  Outputs:
+    ApiGatewayRestApiId:
+      Value:
+        Ref: ApiGatewayRestApi
+      Export:
+        Name: ${self:service}-${self:provider.stage}-ApiGatewayRestApiId
+    
+    ApiGatewayRestApiRootResourceId:
+      Value:
+        Fn::GetAtt:
+          - ApiGatewayRestApi
+          - RootResourceId
+      Export:
+        Name: ${self:service}-${self:provider.stage}-ApiGatewayRestApiRootResourceId
+    
+    S3BucketName:
+      Value: ${self:custom.s3Bucket}
+      Export:
+        Name: ${self:service}-${self:provider.stage}-S3BucketName
+

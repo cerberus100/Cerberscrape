@@ -1,0 +1,30 @@
+version: 1
+applications:
+  - appRoot: apps/ui
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - npm ci
+        build:
+          commands:
+            - npm run build
+      artifacts:
+        baseDirectory: dist
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - node_modules/**/*
+    backend:
+      phases:
+        build:
+          commands:
+            - cd ../../
+            - pip install -r requirements.txt
+            - python -m pytest tests/ -v
+      artifacts:
+        baseDirectory: .
+        files:
+          - '**/*'
+

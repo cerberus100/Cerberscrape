@@ -1,0 +1,35 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    command: uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      - DATAFORGE_DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/dataforge
+      - DATAFORGE_EXPORT_BUCKET_PATH=/exports
+      - DATAFORGE_CORS_ALLOW_ORIGINS=http://localhost:5173,http://localhost:3000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+      - exports:/exports
+    depends_on:
+      - db
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: dataforge
+    ports:
+      - "5433:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+volumes:
+  db_data:
+  exports:
+
+
+
